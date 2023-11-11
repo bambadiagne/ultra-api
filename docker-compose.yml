@@ -1,0 +1,31 @@
+version: "3.1"
+name: ultra-monolithic
+services:
+  db:
+    container_name: db
+    image: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - monolithic-data:/var/lib/postgresql/data
+    env_file:
+      - .env
+  api:
+    container_name: api
+    build: .
+    volumes:
+      - .:/backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+  redis:
+    image: redis
+    container_name: redis
+    ports:
+      - "6379:6379"    
+volumes:
+  monolithic-data:
+  
