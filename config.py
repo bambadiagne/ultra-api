@@ -1,5 +1,7 @@
+from datetime import timedelta
 import os
 basedir = os.path.abspath(os.path.dirname(__file__))
+
 
 class Config(object):
     DEBUG = False
@@ -13,8 +15,13 @@ class Config(object):
     CACHE_REDIS_DB = os.environ['CACHE_REDIS_DB']
     CACHE_REDIS_URL = os.environ['CACHE_REDIS_URL']
     CACHE_DEFAULT_TIMEOUT = os.environ['CACHE_DEFAULT_TIMEOUT']
+    JWT_EXPIRATION_DELTA = timedelta(seconds=3000)
+    JWT_AUTH_USERNAME_KEY = 'email'
+
+
 class ProductionConfig(Config):
     DEBUG = False
+
 
 class DevelopmentConfig(Config):
     DEVELOPMENT = True
