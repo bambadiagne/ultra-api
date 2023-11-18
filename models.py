@@ -2,6 +2,7 @@
 from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
+
 class Todo(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
@@ -9,6 +10,8 @@ class Todo(db.Model):
     description = db.Column(db.String(500), nullable=True)
     completed = db.Column(db.Boolean, default=False, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    deadline = db.Column(db.DateTime, nullable=True)
 
     def __repr__(self):
         return f'<Todo {self.title}>'
@@ -20,7 +23,8 @@ class Todo(db.Model):
             'title': self.title,
             'description': self.description,
             'completed': self.completed,
-            'user_id': self.user_id
+            'user_id': self.user_id,
+            'deadline': self.deadline.strftime('%m/%d/%y %H:%M:%S')
         }
 
 

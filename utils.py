@@ -2,15 +2,13 @@ from functools import wraps
 from flask import request
 from flask_jwt import current_identity
 
-from models import Todo
-
 
 def verify_body(required_fields):
     def _verify_body(f):
         @wraps(f)
         def __verify_body(*args, **kwargs):
             data = request.get_json(silent=True)
-            result = f(*args, **kwargs)
+
             if (not data):
                 return {'message': "Empty body", 'status': 'FAILED'}
             if (len(data) != len(required_fields)):
@@ -21,7 +19,7 @@ def verify_body(required_fields):
                     return {"message": f"Champ {required_field[0]} requis", 'status': 'FAILED'}
                 if (not type(body_property) is required_field[1]):
                     return {"message": f"Champ {required_field[0]} doit être de type {required_field[1]}", 'status': 'FAILED'}
-            return result
+            return f(*args, **kwargs)
         return __verify_body
     return _verify_body
 
