@@ -5,6 +5,7 @@ Brotli==1.1.0
 cachelib==0.9.0
 click==8.1.7
 Deprecated==1.2.14
+Faker==20.0.3
 Flask==2.3.3
 Flask-Caching==2.1.0
 Flask-Compress==1.14
@@ -27,9 +28,11 @@ packaging==23.2
 psycopg2-binary==2.9.9
 Pygments==2.16.1
 PyJWT==1.4.2
+python-dateutil==2.8.2
 python-dotenv==1.0.0
 redis==5.0.1
 rich==13.6.0
+six==1.16.0
 SQLAlchemy==2.0.23
 typing_extensions==4.8.0
 Werkzeug==3.0.1

@@ -4,7 +4,6 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 class Config(object):
-    DEBUG = False
     TESTING = False
     CSRF_ENABLED = True
     SECRET_KEY = os.environ['SECRET_KEY']
@@ -15,7 +14,7 @@ class Config(object):
     CACHE_REDIS_DB = os.environ['CACHE_REDIS_DB']
     CACHE_REDIS_URL = os.environ['CACHE_REDIS_URL']
     CACHE_DEFAULT_TIMEOUT = os.environ['CACHE_DEFAULT_TIMEOUT']
-    JWT_EXPIRATION_DELTA = timedelta(seconds=3000)
+    JWT_EXPIRATION_DELTA = timedelta(seconds=86400)
     JWT_AUTH_USERNAME_KEY = 'email'
 
 

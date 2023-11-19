@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 import os
 from dotenv import load_dotenv
 import secrets
@@ -12,7 +13,7 @@ from flask_migrate import Migrate
 from sqlalchemy import delete
 from models import Todo, User, db
 from werkzeug.security import generate_password_hash, check_password_hash
-from utils import is_user_todo, verify_body
+from utils import build_query, is_user_todo, verify_body
 load_dotenv()
 app = Flask(__name__)
 app.config.from_object(os.environ['APP_SETTINGS'])
@@ -24,6 +25,7 @@ limiter = Limiter(
 )
 migrate = Migrate(app, db)
 cache = Cache(app)
+
 compress = Compress(app)
 
 with app.app_context():
@@ -54,26 +56,9 @@ def error_handler(error):
 
 
 @app.route('/')
+@limiter.limit("100/hour")
 def hello():
     return 'OK', 200
-
-
-@app.route('/api/v1/todo', methods=['POST'])
-@jwt_required()
-@verify_body([('title', str), ('description', str), ('completed', bool), ('deadline', str)])
-def add_todo():
-    request_body = request.get_json(silent=True)
-    deadline = datetime.strptime(request_body['deadline'], '%m/%d/%y %H:%M:%S')
-    todo = Todo(
-        title=request_body['title'],
-        description=request_body['description'],
-        completed=request_body['completed'],
-        user_id=current_identity.id,
-        deadline=deadline
-    )
-    db.session.add(todo)
-    db.session.commit()
-    return {'requestStatus': True, "data": todo.serialize}, 201
 
 
 @app.route('/signup', methods=['POST'])
@@ -99,15 +84,57 @@ def signup():
         return jsonify({'message': str(e), 'requestStatus': False}), 500
 
 
+@app.route('/api/v1/todo', methods=['POST'])
+@jwt_required()
+@verify_body([('title', str), ('description', str), ('completed', bool), ('deadline', str)])
+def add_todo():
+    try:
+        request_body = request.get_json(silent=True)
+        deadline = datetime.strptime(
+            request_body['deadline'], '%m/%d/%y %H:%M:%S')
+        todo = Todo(
+            title=request_body['title'],
+            description=request_body['description'],
+            completed=request_body['completed'],
+            user_id=current_identity.id,
+            deadline=deadline
+        )
+        db.session.add(todo)
+        db.session.commit()
+        return {'requestStatus': True, "data": todo.serialize}, 201
+    except BaseException as e:
+        return {'message': str(e), 'requestStatus': False}, 500
+
+
+@app.route('/api/v1/todos', methods=['GET'])
+@jwt_required()
+@limiter.limit("200/hour")
+@cache.cached(timeout=30, query_string=True)
+def get_todos():
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = 1000
+        query_results = build_query(request.args, current_identity.id)
+        if (query_results.count() == 0):
+            return {"count": 2, "data": [], "count2": 0, "requestStatus": True, }, 200
+        paginated_data = [todo.serialize for todo in query_results.paginate(
+            page=page, per_page=per_page, max_per_page=1000, error_out=False).items]
+        return {"requestStatus": True, "count": len(paginated_data), "data": paginated_data, "total": query_results.count(), "current_page": page, }, 200
+    except BaseException as e:
+        cache.delete_memoized(get_todos)
+        return {"requestStatus": False, "message": "TodosNotFound", "error": str(e), }, 404
+
+
 @app.route('/api/v1/todo/<int:id_todo>', methods=['GET'])
 @jwt_required()
+@is_user_todo()
 @limiter.limit("100/hour")
-@cache.cached(timeout=15)
+@cache.cached(timeout=30)
 def get_one_todo(id_todo):
     try:
         todo = Todo.query.get(id_todo)
         if (todo):
-            return {"requestStatus": True, "todo": todo.serialize}, 200
+            return {"requestStatus": True, "data": todo.serialize}, 200
         return {"requestStatus": True, "message": "TodoNotFound"}, 404
     except BaseException as e:
         return {"requestStatus": False, "message": "TodoNotFound", "error": str(e)}, 404
@@ -128,7 +155,9 @@ def update_one_todo(id_todo):
             todo.deadline = datetime.strptime(
                 request_body['deadline'], '%m/%d/%y %H:%M:%S')
             db.session.commit()
-            return {"requestStatus": True, "todo": todo.serialize}, 200
+            cache.delete_memoized(get_todos)
+            cache.delete_memoized(get_one_todo, id_todo)
+            return {"requestStatus": True, "data": todo.serialize}, 200
         return {"requestStatus": True, "message": "TodoNotFound"}, 404
     except BaseException as e:
         return {"requestStatus": False, "message": "TodoNotFound", "error": str(e)}, 404
@@ -146,18 +175,6 @@ def delete_one_todo(id_todo):
         return {"requestStatus": True, "message": "TodoNotFound"}, 404
     except BaseException as e:
         return {"requestStatus": False, "message": "TodoNotFound", "error": str(e)}, 404
-
-
-@app.route('/api/v1/todos', methods=['GET'])
-@jwt_required()
-@limiter.limit("200/hour")
-@cache.cached(timeout=15)
-def get_todos():
-    try:
-        results = [todo.serialize for todo in current_identity.todos]
-        return {"count": len(results), "todos": results}, 200
-    except BaseException as e:
-        return {"requestStatus": False, "message": "TodosNotFound", "error": str(e)}, 404
 
 
 if (__name__ == '__main__'):

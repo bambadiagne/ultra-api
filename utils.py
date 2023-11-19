@@ -1,6 +1,7 @@
 from functools import wraps
 from flask import request
 from flask_jwt import current_identity
+from models import Todo
 
 
 def verify_body(required_fields):
@@ -34,3 +35,23 @@ def is_user_todo():
             return {"requestStatus": False, "message": "NotAuthorized"}, 401
         return __is_user_todo
     return _is_user_todo
+
+
+def build_query(args, user_id):
+    query = Todo.query
+
+    completed = args.get('completed', None, type=bool)
+    deadline = args.get('deadline', None, type=str)
+    description = args.get('description', None, type=str)
+    title = args.get('title', None, type=str)
+    if completed is not None:
+        completed = True if completed == "true" else False
+        query = query.filter(Todo.completed == completed)
+    if deadline:
+        query = query.filter(Todo.deadline == deadline)
+    if description:
+        query = query.filter(Todo.description.ilike(f"%{description}%"))
+    if title:
+        query = query.filter(Todo.title.ilike(f"%{title}%"))
+    query = query.filter(Todo.user_id == user_id)
+    return query
