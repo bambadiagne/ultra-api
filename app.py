@@ -10,6 +10,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_jwt import JWT, jwt_required, current_identity
 from flask_migrate import Migrate
+from mailing import template_create
 from sqlalchemy import delete
 from models import Todo, User, db
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -79,7 +80,25 @@ def signup():
                     password=generate_password_hash(request_body['password']), token=token, role="simple")
         db.session.add(user)
         db.session.commit()
+        template_create(user)
         return jsonify({'message': 'Utilisateur créé', 'requestStatus': True}), 201
+    except BaseException as e:
+        return jsonify({'message': str(e), 'requestStatus': False}), 500
+
+
+@app.route('/check-account', methods=['POST'])
+@verify_body([('token', str),])
+@jwt_required()
+def check_account():
+    try:
+        request_body = request.get_json(silent=True)
+        user = User.query.filter_by(token=request_body['token']).first()
+        if (user):
+            user.token = secrets.token_hex(16)
+            user.emailChecked = True
+            db.session.commit()
+            return jsonify({'message': 'User\'mail checked', 'requestStatus': True}), 200
+        return jsonify({'message': 'TokenNotValid', 'requestStatus': False}), 404
     except BaseException as e:
         return jsonify({'message': str(e), 'requestStatus': False}), 500
 
