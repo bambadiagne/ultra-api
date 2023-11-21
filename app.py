@@ -9,26 +9,37 @@ from flask_compress import Compress
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_jwt import JWT, jwt_required, current_identity
+from flask_cors import CORS
 from flask_migrate import Migrate
 from mailing import template_create
 from sqlalchemy import delete
 from models import Todo, User, db
 from werkzeug.security import generate_password_hash, check_password_hash
 from utils import build_query, is_user_todo, verify_body
+import logging
+from watchtower import CloudWatchLogHandler
+
 load_dotenv()
+logging.basicConfig(level=logging.INFO)
+
 app = Flask(__name__)
 app.config.from_object(os.environ['APP_SETTINGS'])
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
+
 limiter = Limiter(
     get_remote_address,
     app=app, storage_uri="memory://",
 )
 migrate = Migrate(app, db)
 cache = Cache(app)
-
 compress = Compress(app)
+cloudwatch_handler = CloudWatchLogHandler(
+    log_group=app.config["AWS_LOG_GROUP"], stream_name=app.config['AWS_LOG_STREAM'],)
+logger = logging.getLogger(__name__)
+logger.addHandler(cloudwatch_handler)
 
+CORS(app, origins=app.config['ALLOWED_HOSTS'])
 with app.app_context():
     db.create_all()
 
@@ -65,6 +76,8 @@ def hello():
 @app.route('/signup', methods=['POST'])
 @verify_body([('name', str), ('email', str), ('password', str),])
 def signup():
+    logger.info({"message": 'signup', "url": request.url,
+                "method": request.method, })
     try:
         request_body = request.get_json(silent=True)
         token = secrets.token_hex(16)
@@ -83,6 +96,8 @@ def signup():
         template_create(user)
         return jsonify({'message': 'Utilisateur créé', 'requestStatus': True}), 201
     except BaseException as e:
+        logger.error({"url": request.url, "error": str(e),
+                     "payload": request_body})
         return jsonify({'message': str(e), 'requestStatus': False}), 500
 
 
@@ -90,6 +105,8 @@ def signup():
 @verify_body([('token', str),])
 @jwt_required()
 def check_account():
+    logger.info({"message": 'check_account',
+                "url": request.url, "method": request.method, })
     try:
         request_body = request.get_json(silent=True)
         user = User.query.filter_by(token=request_body['token']).first()
@@ -100,6 +117,7 @@ def check_account():
             return jsonify({'message': 'User\'mail checked', 'requestStatus': True}), 200
         return jsonify({'message': 'TokenNotValid', 'requestStatus': False}), 404
     except BaseException as e:
+        logger.error({"url": request.url, "error": str(e)})
         return jsonify({'message': str(e), 'requestStatus': False}), 500
 
 
@@ -107,6 +125,8 @@ def check_account():
 @jwt_required()
 @verify_body([('title', str), ('description', str), ('completed', bool), ('deadline', str)])
 def add_todo():
+    logger.info({"message": 'add_todo', "url": request.url,
+                "method": request.method, })
     try:
         request_body = request.get_json(silent=True)
         deadline = datetime.strptime(
@@ -122,6 +142,7 @@ def add_todo():
         db.session.commit()
         return {'requestStatus': True, "data": todo.serialize}, 201
     except BaseException as e:
+        logger.error({"url": request.url, "error": str(e)})
         return {'message': str(e), 'requestStatus': False}, 500
 
 
@@ -130,6 +151,8 @@ def add_todo():
 @limiter.limit("200/hour")
 @cache.cached(timeout=30, query_string=True)
 def get_todos():
+    logger.info({"message": 'get_todos', "url": request.url,
+                "method": request.method, })
     try:
         page = request.args.get('page', 1, type=int)
         per_page = 1000
@@ -141,6 +164,7 @@ def get_todos():
         return {"requestStatus": True, "count": len(paginated_data), "data": paginated_data, "total": query_results.count(), "current_page": page, }, 200
     except BaseException as e:
         cache.delete_memoized(get_todos)
+        logger.error({"url": request.url, "error": str(e)})
         return {"requestStatus": False, "message": "TodosNotFound", "error": str(e), }, 404
 
 
@@ -150,12 +174,16 @@ def get_todos():
 @limiter.limit("100/hour")
 @cache.cached(timeout=30)
 def get_one_todo(id_todo):
+    logger.info({"message": 'get_one_todo', "url": request.url,
+                "method": request.method, })
     try:
         todo = Todo.query.get(id_todo)
         if (todo):
+            logger.info({"message": 'success', "data": todo.serialize})
             return {"requestStatus": True, "data": todo.serialize}, 200
         return {"requestStatus": True, "message": "TodoNotFound"}, 404
     except BaseException as e:
+        logger.error({"url": request.url, "error": str(e)})
         return {"requestStatus": False, "message": "TodoNotFound", "error": str(e)}, 404
 
 
@@ -164,6 +192,8 @@ def get_one_todo(id_todo):
 @is_user_todo()
 @verify_body([('title', str), ('description', str), ('completed', bool), ('deadline', str)])
 def update_one_todo(id_todo):
+    logger.info({"message": 'update_one_todo',
+                "url": request.url, "method": request.method, })
     try:
         request_body = request.get_json(silent=True)
         todo = Todo.query.get(id_todo)
@@ -179,6 +209,8 @@ def update_one_todo(id_todo):
             return {"requestStatus": True, "data": todo.serialize}, 200
         return {"requestStatus": True, "message": "TodoNotFound"}, 404
     except BaseException as e:
+        logger.error({"url": request.url, "error": str(e),
+                     "payload": request_body})
         return {"requestStatus": False, "message": "TodoNotFound", "error": str(e)}, 404
 
 
@@ -186,6 +218,8 @@ def update_one_todo(id_todo):
 @jwt_required()
 @is_user_todo()
 def delete_one_todo(id_todo):
+    logger.info({"message": 'delete_one_todo',
+                "url": request.url, "method": request.method, })
     try:
         deleted_todo = Todo.query.filter_by(id=id_todo).delete()
         if (deleted_todo):
@@ -193,6 +227,7 @@ def delete_one_todo(id_todo):
             return {"requestStatus": True, "message": "TodoDeleted"}, 200
         return {"requestStatus": True, "message": "TodoNotFound"}, 404
     except BaseException as e:
+        logger.error({"url": request.url, "error": str(e)})
         return {"requestStatus": False, "message": "TodoNotFound", "error": str(e)}, 404
 
 
