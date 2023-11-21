@@ -10,6 +10,7 @@ Deprecated==1.2.14
 Flask==2.3.3
 Flask-Caching==2.1.0
 Flask-Compress==1.14
+Flask-Cors==4.0.0
 Flask-JWT==0.3.2
 Flask-Limiter==3.5.0
 Flask-Migrate==4.0.5
@@ -39,6 +40,7 @@ six==1.16.0
 SQLAlchemy==2.0.23
 typing_extensions==4.8.0
 urllib3==1.26.18
+watchtower==3.0.1
 Werkzeug==3.0.1
 wrapt==1.16.0
 zipp==3.17.0
