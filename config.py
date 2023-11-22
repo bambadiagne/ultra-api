@@ -16,10 +16,14 @@ class Config(object):
     CACHE_DEFAULT_TIMEOUT = os.environ['CACHE_DEFAULT_TIMEOUT']
     JWT_EXPIRATION_DELTA = timedelta(seconds=86400)
     JWT_AUTH_USERNAME_KEY = 'email'
+    ALLOWED_HOSTS = ["*"]
+    AWS_LOG_GROUP = os.environ['AWS_LOG_GROUP']
+    AWS_LOG_STREAM = os.environ['AWS_LOG_STREAM']
 
 
 class ProductionConfig(Config):
     DEBUG = False
+    ALLOWED_HOSTS = os.environ['ALLOWED_HOSTS'].split(',')
 
 
 class DevelopmentConfig(Config):
