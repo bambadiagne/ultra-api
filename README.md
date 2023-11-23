@@ -1,5 +1,5 @@
 # ultra-api
-This is a optimized RESTful API. It's built with Flask,PostgresSQL,Redis andDocker.
+This is a optimized RESTful API. It's built with Flask,PostgresSQL,Redis and Docker.The aim is to show the different concepts of a backend(caching,security,...) that are sometimes considered as just CRUD operations.
 
 ## Project stack 
 | Stack | Logo |
@@ -22,7 +22,7 @@ This is a optimized RESTful API. It's built with Flask,PostgresSQL,Redis andDock
 
 ## Endpoints
 
-- `/register`: Register a new user
+- `/api/v1/user`: Register a new user
 - `/auth`: Log in a user
 - `/api/v1/todos`: Get all todos for the current user
 - `/api/v1/todo/<int:id_todo>`: Get, update, or delete a specific todo
@@ -33,6 +33,7 @@ This is a optimized RESTful API. It's built with Flask,PostgresSQL,Redis andDock
 2. Create .env file copy .env.sample contents and change the values(if you not change it,sending mail and logging system aren't running)
 
 3. You can use the docker-compose file it's so simple but you need that Docker installed in your device
+4. You can generate data by running gen_todos.py script who uses threading and generate 100k todo rows in your db
 
 ```bash
 docker-compose up -d
@@ -53,6 +54,6 @@ PUT /api/v1/todo/1 Content-Type: application/json
 ```
 
 ## Contributing
-Pull requests are welcome.
+Pull requests are welcome [CONTRIBUTING](CONTRIBUTING.md).
 ## License
 [MIT](LICENSE.md)

@@ -73,7 +73,7 @@ def hello():
     return 'OK', 200
 
 
-@app.route('/signup', methods=['POST'])
+@app.route('/api/v1/users', methods=['POST'])
 @verify_body([('name', str), ('email', str), ('password', str),])
 def signup():
     logger.info({"message": 'signup', "url": request.url,
