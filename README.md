@@ -1,4 +1,4 @@
-# ultra-api
+# Ultra API
 This is a optimized RESTful API. It's built with Flask,PostgresSQL,Redis and Docker.The aim is to show the different concepts of a backend(caching,security,...) that are sometimes considered as just CRUD operations.
 
 ## Project stack 

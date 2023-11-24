@@ -158,7 +158,7 @@ def get_todos():
         per_page = 1000
         query_results = build_query(request.args, current_identity.id)
         if (query_results.count() == 0):
-            return {"count": 2, "data": [], "count2": 0, "requestStatus": True, }, 200
+            return {"requestStatus": True, "count": 0, "data": [], "total": 0, "current_page": page}, 200
         paginated_data = [todo.serialize for todo in query_results.paginate(
             page=page, per_page=per_page, max_per_page=1000, error_out=False).items]
         return {"requestStatus": True, "count": len(paginated_data), "data": paginated_data, "total": query_results.count(), "current_page": page, }, 200
