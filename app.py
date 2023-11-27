@@ -8,16 +8,16 @@ from flask_caching import Cache
 from flask_compress import Compress
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_jwt import JWT, jwt_required, current_identity
 from flask_cors import CORS
 from flask_migrate import Migrate
 from mailing import template_create
-from sqlalchemy import delete
 from models import Todo, User, db
 from werkzeug.security import generate_password_hash, check_password_hash
 from utils import build_query, is_user_todo, verify_body
 import logging
 from watchtower import CloudWatchLogHandler
+
+from flask_jwt_extended import create_access_token, set_access_cookies, jwt_required, get_jwt_identity, unset_jwt_cookies, JWTManager
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -44,33 +44,42 @@ with app.app_context():
     db.create_all()
 
 
-def identity(payload):
-    return User.query.get(payload['user_id'])
-
-
-def authenticate(email, password):
-    user = User.query.filter_by(email=email).first()
-    if (user and check_password_hash(user.password, password)):
-        return user
-
-
-jwt = JWT(app, authenticate, identity)
-
-
-@jwt.jwt_payload_handler
-def make_payload(identity):
-    return {'user_id': identity.id, 'iat': datetime.utcnow(), 'exp': datetime.utcnow() + app.config['JWT_EXPIRATION_DELTA'], 'nbf': datetime.utcnow()}
-
-
-@jwt.jwt_error_handler
-def error_handler(error):
-    return jsonify({'message': error.description, 'requestStatus': False}), 401
+jwt = JWTManager(app)
 
 
 @app.route('/')
 @limiter.limit("100/hour")
 def hello():
     return 'OK', 200
+
+
+@app.route('/api/v1/login', methods=['POST'])
+@verify_body([('email', str), ('password', str),])
+def login():
+    logger.info({"message": 'try_to_login', "url": request.url,
+                "method": request.method, })
+    try:
+        request_body = request.get_json(silent=True)
+        user = User.query.filter_by(email=request_body['email']).first()
+        if (user and check_password_hash(user.password, request_body['password'])):
+            access_token = create_access_token(identity=user.email)
+            response = jsonify(
+                {'message': "Connexion réussie", 'requestStatus': True, })
+            set_access_cookies(response, access_token)
+            return response, 200
+        return jsonify({'message': 'Identifiants incorrects', 'requestS': False, }), 401
+    except BaseException as e:
+        logger.error({"url": request.url, "error": str(e),
+                     "payload": request_body})
+        return jsonify({'message': str(e), 'status': 'FAILED'}), 500
+
+
+@app.route('/api/v1/logout', methods=['POST'])
+def logout():
+    response = jsonify(
+        {'requestStatus': True, 'message': 'Déconnexion réussie'})
+    unset_jwt_cookies(response)
+    return response, 200
 
 
 @app.route('/api/v1/users', methods=['POST'])
@@ -125,6 +134,7 @@ def check_account():
 @jwt_required()
 @verify_body([('title', str), ('description', str), ('completed', bool), ('deadline', str)])
 def add_todo():
+    current_identity = User.query.filter_by(email=get_jwt_identity()).first()
     logger.info({"message": 'add_todo', "url": request.url,
                 "method": request.method, })
     try:
@@ -154,9 +164,11 @@ def get_todos():
     logger.info({"message": 'get_todos', "url": request.url,
                 "method": request.method, })
     try:
+        current_user = User.query.filter_by(email=get_jwt_identity()).first()
+
         page = request.args.get('page', 1, type=int)
         per_page = 1000
-        query_results = build_query(request.args, current_identity.id)
+        query_results = build_query(request.args, current_user.id)
         if (query_results.count() == 0):
             return {"requestStatus": True, "count": 0, "data": [], "total": 0, "current_page": page}, 200
         paginated_data = [todo.serialize for todo in query_results.paginate(
@@ -170,14 +182,16 @@ def get_todos():
 
 @app.route('/api/v1/todo/<int:id_todo>', methods=['GET'])
 @jwt_required()
-@is_user_todo()
 @limiter.limit("100/hour")
 @cache.cached(timeout=30)
 def get_one_todo(id_todo):
     logger.info({"message": 'get_one_todo', "url": request.url,
                 "method": request.method, })
     try:
-        todo = Todo.query.get(id_todo)
+        current_identity = User.query.filter_by(
+            email=get_jwt_identity()).first()
+        todo = Todo.query.filter(
+            Todo.id == id_todo, Todo.user_id == current_identity.id).first()
         if (todo):
             logger.info({"message": 'success', "data": todo.serialize})
             return {"requestStatus": True, "data": todo.serialize}, 200
@@ -189,14 +203,16 @@ def get_one_todo(id_todo):
 
 @app.route('/api/v1/todo/<int:id_todo>', methods=['PUT'])
 @jwt_required()
-@is_user_todo()
 @verify_body([('title', str), ('description', str), ('completed', bool), ('deadline', str)])
 def update_one_todo(id_todo):
     logger.info({"message": 'update_one_todo',
                 "url": request.url, "method": request.method, })
     try:
         request_body = request.get_json(silent=True)
-        todo = Todo.query.get(id_todo)
+        current_identity = User.query.filter_by(
+            email=get_jwt_identity()).first()
+        todo = Todo.query.filter(
+            Todo.id == id_todo, Todo.user_id == current_identity.id).first()
         if (todo):
             todo.title = request_body['title']
             todo.description = request_body['description']
@@ -216,12 +232,14 @@ def update_one_todo(id_todo):
 
 @app.route('/api/v1/todo/<int:id_todo>', methods=['DELETE'])
 @jwt_required()
-@is_user_todo()
 def delete_one_todo(id_todo):
     logger.info({"message": 'delete_one_todo',
                 "url": request.url, "method": request.method, })
     try:
-        deleted_todo = Todo.query.filter_by(id=id_todo).delete()
+        current_identity = User.query.filter_by(
+            email=get_jwt_identity()).first()
+        deleted_todo = Todo.query.filter(
+            Todo.id == id_todo, Todo.user_id == current_identity.id).delete()
         if (deleted_todo):
             db.session.commit()
             return {"requestStatus": True, "message": "TodoDeleted"}, 200
