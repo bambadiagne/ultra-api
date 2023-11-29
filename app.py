@@ -13,7 +13,7 @@ from flask_migrate import Migrate
 from mailing import template_create
 from models import Todo, User, db
 from werkzeug.security import generate_password_hash, check_password_hash
-from utils import build_query, is_user_todo, verify_body
+from utils import build_query, verify_body
 import logging
 from watchtower import CloudWatchLogHandler
 
@@ -134,7 +134,7 @@ def check_account():
 @jwt_required()
 @verify_body([('title', str), ('description', str), ('completed', bool), ('deadline', str)])
 def add_todo():
-    current_identity = User.query.filter_by(email=get_jwt_identity()).first()
+    current_user = User.query.filter_by(email=get_jwt_identity()).first()
     logger.info({"message": 'add_todo', "url": request.url,
                 "method": request.method, })
     try:
@@ -145,7 +145,7 @@ def add_todo():
             title=request_body['title'],
             description=request_body['description'],
             completed=request_body['completed'],
-            user_id=current_identity.id,
+            user_id=current_user.id,
             deadline=deadline
         )
         db.session.add(todo)
@@ -188,10 +188,10 @@ def get_one_todo(id_todo):
     logger.info({"message": 'get_one_todo', "url": request.url,
                 "method": request.method, })
     try:
-        current_identity = User.query.filter_by(
+        current_user = User.query.filter_by(
             email=get_jwt_identity()).first()
         todo = Todo.query.filter(
-            Todo.id == id_todo, Todo.user_id == current_identity.id).first()
+            Todo.id == id_todo, Todo.user_id == current_user.id).first()
         if (todo):
             logger.info({"message": 'success', "data": todo.serialize})
             return {"requestStatus": True, "data": todo.serialize}, 200
@@ -209,10 +209,10 @@ def update_one_todo(id_todo):
                 "url": request.url, "method": request.method, })
     try:
         request_body = request.get_json(silent=True)
-        current_identity = User.query.filter_by(
+        current_user = User.query.filter_by(
             email=get_jwt_identity()).first()
         todo = Todo.query.filter(
-            Todo.id == id_todo, Todo.user_id == current_identity.id).first()
+            Todo.id == id_todo, Todo.user_id == current_user.id).first()
         if (todo):
             todo.title = request_body['title']
             todo.description = request_body['description']
@@ -236,10 +236,10 @@ def delete_one_todo(id_todo):
     logger.info({"message": 'delete_one_todo',
                 "url": request.url, "method": request.method, })
     try:
-        current_identity = User.query.filter_by(
+        current_user = User.query.filter_by(
             email=get_jwt_identity()).first()
         deleted_todo = Todo.query.filter(
-            Todo.id == id_todo, Todo.user_id == current_identity.id).delete()
+            Todo.id == id_todo, Todo.user_id == current_user.id).delete()
         if (deleted_todo):
             db.session.commit()
             return {"requestStatus": True, "message": "TodoDeleted"}, 200
