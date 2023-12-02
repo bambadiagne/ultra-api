@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import os
 from dotenv import load_dotenv
@@ -10,11 +10,12 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from flask_migrate import Migrate
-from mailing import template_create
+from mailing import send_email, template_create
 from models import Todo, User, db
 from werkzeug.security import generate_password_hash, check_password_hash
 from utils import build_query, verify_body
 import logging
+from flask_apscheduler import APScheduler
 from watchtower import CloudWatchLogHandler
 
 from flask_jwt_extended import create_access_token, set_access_cookies, jwt_required, get_jwt_identity, unset_jwt_cookies, JWTManager
@@ -38,6 +39,9 @@ cloudwatch_handler = CloudWatchLogHandler(
     log_group=app.config["AWS_LOG_GROUP"], stream_name=app.config['AWS_LOG_STREAM'],)
 logger = logging.getLogger(__name__)
 logger.addHandler(cloudwatch_handler)
+scheduler = APScheduler()
+scheduler.init_app(app)
+scheduler.start()
 
 CORS(app, origins=app.config['ALLOWED_HOSTS'])
 with app.app_context():
@@ -45,6 +49,29 @@ with app.app_context():
 
 
 jwt = JWTManager(app)
+
+
+@scheduler.task('interval', id='send_remainder_todo',
+                seconds=3600)
+def send_remainder_todo():
+    logger.info({"message": 'send_remainder_todo', "url": request.url,
+                "method": request.method, })
+    try:
+        time_threshold = datetime.utcnow() + timedelta(hours=1)
+        todos = [todo.serialize for todo in Todo.query.filter(
+            Todo.deadline < time_threshold, Todo.completed == False).all()]
+        users = User.query.filter(User.id.in_(
+            [todo['user_id'] for todo in todos]), User.has_subscribed == True).all()
+        for user in users:
+            send_email(os.environ['AWS_MAIL_SENDER'], user.email, "Rappel tache à faire", f"""
+                <h2>Bonjour {user.name},</h2><br>
+                <p>Vous avez des tâches à faire dans moins d'une heure</p>
+                <ul>
+                    {"".join([f"<li>{todo['title']}</li>" for todo in todos if todo['user_id'] == user.id])}
+                </ul>
+                        """)
+    except BaseException as e:
+        logger.error({"url": request.url, "error": str(e)})
 
 
 @app.route('/')
