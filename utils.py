@@ -1,7 +1,8 @@
 from functools import wraps
+import logging
 from flask import request
-from flask_jwt import current_identity
-from models import Todo
+from flask_jwt_extended import get_jwt_identity
+from models import Todo, User
 
 
 def verify_body(required_fields):
@@ -30,6 +31,8 @@ def is_user_todo():
         @wraps(f)
         def __is_user_todo(*args, **kwargs):
             result = f(*args, **kwargs)
+            current_identity = User.query.filter_by(
+                email=get_jwt_identity()).first()
             if (any(todo.id == int(request.view_args.get('id_todo')) for todo in current_identity.todos)):
                 return result
             return {"requestStatus": False, "message": "NotAuthorized"}, 401

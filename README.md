@@ -6,6 +6,7 @@ This is a optimized RESTful API. It's built with Flask,PostgresSQL,Redis and Doc
 | ----- | ---- |
 | Docker| <a href="https://www.docker.com/" target="_blank" rel="noreferrer"> <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/docker/docker-original-wordmark.svg" alt="docker" width="40" height="40"/> </a>     |
 | Flask | <a href="https://flask.palletsprojects.com/" target="_blank" rel="noreferrer"> <img src="https://www.vectorlogo.zone/logos/pocoo_flask/pocoo_flask-icon.svg" alt="flask" width="40" height="40"/> </a> |
+| AWS | <a href="https://aws.amazon.com/"> <img src="https://icongr.am/devicon/amazonwebservices-original.svg?size=128&color=currentColor"  alt="redis" width="40" height="40"/> </a> |
 | PostgreSQL |<a href="https://www.postgresql.org" target="_blank" rel="noreferrer"> <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/postgresql/postgresql-original-wordmark.svg" alt="postgresql" width="40" height="40"/> </a> |
 | Redis |  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/redis/redis-original-wordmark.svg" alt="redis" width="40" height="40"/> </a> |
 

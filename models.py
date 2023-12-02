@@ -38,6 +38,7 @@ class User(db.Model):
     emailChecked = db.Column(db.Boolean, nullable=False, default=False)
     role = db.Column(db.String(100), nullable=False)
     todos = db.relationship('Todo', backref='user')
+    has_subscribed = db.Column(db.Boolean, default=False,)
 
     def __repr__(self):
         return f'<User {self.name}>'
