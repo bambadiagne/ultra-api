@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import logging
 import os
+from utils import build_query, verify_body
 from dotenv import load_dotenv
 import secrets
 from flask import Flask, jsonify, request
@@ -10,15 +11,13 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from flask_migrate import Migrate
+from flask_jwt_extended import create_access_token, set_access_cookies, jwt_required, get_jwt_identity, unset_jwt_cookies, JWTManager
+from flask_apscheduler import APScheduler
 from mailing import send_email, template_create
 from models import Todo, User, db
 from werkzeug.security import generate_password_hash, check_password_hash
-from utils import build_query, verify_body
-import logging
-from flask_apscheduler import APScheduler
 from watchtower import CloudWatchLogHandler
 
-from flask_jwt_extended import create_access_token, set_access_cookies, jwt_required, get_jwt_identity, unset_jwt_cookies, JWTManager
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +33,7 @@ limiter = Limiter(
 )
 migrate = Migrate(app, db)
 cache = Cache(app)
+cache.init_app(app)
 compress = Compress(app)
 cloudwatch_handler = CloudWatchLogHandler(
     log_group=app.config["AWS_LOG_GROUP"], stream_name=app.config['AWS_LOG_STREAM'],)
@@ -94,11 +94,11 @@ def login():
                 {'message': "Connexion réussie", 'requestStatus': True, })
             set_access_cookies(response, access_token)
             return response, 200
-        return jsonify({'message': 'Identifiants incorrects', 'requestS': False, }), 401
+        return jsonify({'message': 'Identifiants incorrects', 'requestStatus': False, }), 401
     except BaseException as e:
         logger.error({"url": request.url, "error": str(e),
                      "payload": request_body})
-        return jsonify({'message': str(e), 'status': 'FAILED'}), 500
+        return jsonify({'message': str(e), 'requestStatus': False}), 500
 
 
 @app.route('/api/v1/logout', methods=['POST'])
@@ -120,16 +120,17 @@ def signup():
         check_if_user_exists = User.query.filter_by(
             name=request_body['name']).first()
         if (check_if_user_exists):
-            return jsonify({'message': 'Pseudo deja pris', 'requestStatus': False})
+            return jsonify({'message': 'Pseudo deja pris', 'requestStatus': False}), 400
         check_if_user_exists = User.query.filter_by(
             email=request_body['email']).first()
         if (check_if_user_exists):
-            return jsonify({'message': 'Email deja pris', 'requestStatus': False})
+            return jsonify({'message': 'Email deja pris', 'requestStatus': False}), 400
         user = User(name=request_body['name'], email=request_body['email'],
                     password=generate_password_hash(request_body['password']), token=token, role="simple")
         db.session.add(user)
         db.session.commit()
-        template_create(user)
+        if (app.config['DEBUG'] == False):
+            template_create(user)
         return jsonify({'message': 'Utilisateur créé', 'requestStatus': True}), 201
     except BaseException as e:
         logger.error({"url": request.url, "error": str(e),
@@ -157,7 +158,7 @@ def check_account():
         return jsonify({'message': str(e), 'requestStatus': False}), 500
 
 
-@app.route('/api/v1/todo', methods=['POST'])
+@app.route('/api/v1/todos', methods=['POST'])
 @jwt_required()
 @verify_body([('title', str), ('description', str), ('completed', bool), ('deadline', str)])
 def add_todo():
@@ -186,7 +187,7 @@ def add_todo():
 @app.route('/api/v1/todos', methods=['GET'])
 @jwt_required()
 @limiter.limit("200/hour")
-@cache.cached(timeout=30, query_string=True)
+@cache.cached(timeout=90, query_string=True,)
 def get_todos():
     logger.info({"message": 'get_todos', "url": request.url,
                 "method": request.method, })
@@ -207,10 +208,10 @@ def get_todos():
         return {"requestStatus": False, "message": "TodosNotFound", "error": str(e), }, 404
 
 
-@app.route('/api/v1/todo/<int:id_todo>', methods=['GET'])
+@app.route('/api/v1/todos/<int:id_todo>', methods=['GET'])
 @jwt_required()
 @limiter.limit("100/hour")
-@cache.cached(timeout=30)
+@cache.cached(timeout=90, key_prefix='get_one_todo')
 def get_one_todo(id_todo):
     logger.info({"message": 'get_one_todo', "url": request.url,
                 "method": request.method, })
@@ -228,7 +229,7 @@ def get_one_todo(id_todo):
         return {"requestStatus": False, "message": "TodoNotFound", "error": str(e)}, 404
 
 
-@app.route('/api/v1/todo/<int:id_todo>', methods=['PUT'])
+@app.route('/api/v1/todos/<int:id_todo>', methods=['PUT'])
 @jwt_required()
 @verify_body([('title', str), ('description', str), ('completed', bool), ('deadline', str)])
 def update_one_todo(id_todo):
@@ -249,6 +250,7 @@ def update_one_todo(id_todo):
             db.session.commit()
             cache.delete_memoized(get_todos)
             cache.delete_memoized(get_one_todo, id_todo)
+
             return {"requestStatus": True, "data": todo.serialize}, 200
         return {"requestStatus": True, "message": "TodoNotFound"}, 404
     except BaseException as e:
@@ -257,7 +259,7 @@ def update_one_todo(id_todo):
         return {"requestStatus": False, "message": "TodoNotFound", "error": str(e)}, 404
 
 
-@app.route('/api/v1/todo/<int:id_todo>', methods=['DELETE'])
+@app.route('/api/v1/todos/<int:id_todo>', methods=['DELETE'])
 @jwt_required()
 def delete_one_todo(id_todo):
     logger.info({"message": 'delete_one_todo',

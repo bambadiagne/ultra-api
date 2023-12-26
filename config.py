@@ -4,7 +4,6 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 
 
 class Config(object):
-    TESTING = False
     CSRF_ENABLED = True
     SECRET_KEY = os.environ['SECRET_KEY']
     SQLALCHEMY_DATABASE_URI = os.environ['SQLALCHEMY_DATABASE_URI']
@@ -24,6 +23,7 @@ class Config(object):
     ALLOWED_HOSTS = ["*"]
     AWS_LOG_GROUP = os.environ['AWS_LOG_GROUP']
     AWS_LOG_STREAM = os.environ['AWS_LOG_STREAM']
+    SQLALCHEMY_DATABASE_TEST_URI = os.environ['SQLALCHEMY_DATABASE_URI']
 
 
 class ProductionConfig(Config):
@@ -32,6 +32,11 @@ class ProductionConfig(Config):
     JWT_COOKIE_SECURE = True
 
 
+class TestingConfig(Config):
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///test.db'
+    CACHE_REDIS_HOST = "localhost"
+    CACHE_REDIS_URL = "redis://localhost:6379/0"
+
+
 class DevelopmentConfig(Config):
-    DEVELOPMENT = True
     DEBUG = True
