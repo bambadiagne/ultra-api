@@ -8,6 +8,7 @@ Brotli==1.1.0
 cachelib==0.9.0
 click==8.1.7
 Deprecated==1.2.14
+Faker==21.0.0
 Flask==2.3.3
 Flask-APScheduler==1.13.1
 Flask-Caching==2.1.0
@@ -17,6 +18,7 @@ Flask-JWT-Extended==4.5.3
 Flask-Limiter==3.5.0
 Flask-Migrate==4.0.5
 Flask-SQLAlchemy==3.1.1
+Flask-Testing==0.8.1
 greenlet==3.0.1
 gunicorn==21.2.0
 importlib-metadata==6.8.0

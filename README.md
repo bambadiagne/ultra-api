@@ -22,16 +22,16 @@ This is a optimized RESTful API. It's built with Flask,PostgresSQL,Redis and Doc
 
 
 ## Endpoints
-
-- `/api/v1/user`: Register a new user
-- `/auth`: Log in a user
+- `/api/v1/users`: Register a new user
+- `/api/v1/login`: Log in a user
+- `/api/v1/logout`: Log out a user
 - `/api/v1/todos`: Get all todos for the current user
-- `/api/v1/todo/<int:id_todo>`: Get, update, or delete a specific todo
+- `/api/v1/todos/<int:id_todo>`: Get, update, or delete a specific todo
 
 ## Installation
-1. Clone the repository: `git clone https://github.com/yourusername/yourrepository.git`
+1. Clone the repository: `git clone https://github.com/bambadiagne/ultra-api.git`
 
-2. Create .env file copy .env.sample contents and change the values(if you not change it,sending mail and logging system aren't running)
+2. Create .env file copy .env.sample contents and change the values(if you not change it,sending mail and logging system aren't working)
 
 3. You can use the docker-compose file it's so simple but you need that Docker installed in your device
 4. You can generate data by running gen_todos.py script who uses threading and generate 100k todo rows in your db
@@ -49,7 +49,7 @@ GET /api/v1/todos?page=1&per_page=10&query=test
 ```
 To update a specific todo:
 ```
-PUT /api/v1/todo/1 Content-Type: application/json
+PUT /api/v1/todos/1 Content-Type: application/json
 
 { "title": "New title", "description": "New description", "completed": true, "deadline": "12/31/21 23:59:59" }
 ```
