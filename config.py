@@ -34,8 +34,8 @@ class ProductionConfig(Config):
 
 class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = 'sqlite:///test.db'
-    CACHE_REDIS_HOST = "localhost"
-    CACHE_REDIS_URL = "redis://localhost:6379/0"
+    CACHE_REDIS_HOST = "redis"
+    CACHE_REDIS_URL = "redis://redis:6379/0"
 
 
 class DevelopmentConfig(Config):
